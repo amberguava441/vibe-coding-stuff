@@ -43,6 +43,7 @@ class get_realsense:
         self.cached_color_image = None
         self.cached_depth_colormap = None
         self.cache_valid_duration = 0.05  # 50ms cache validity
+        self.cached_raw_depth = None
         
         print(f"{self.device_name} initialized successfully")
     
@@ -110,19 +111,27 @@ class get_realsense:
             print(f"Error capturing RGB image: {e}")
             return None
 
-    def get_rs_depth(self):
+    def get_rs_depth(self, colorized=False):
         """
         Capture depth image from RealSense camera with caching for performance.
         
+        Args:
+            colorized (bool): If True, return colorized depth map for visualization.
+                            If False, return raw depth values in millimeters.
+        
         Returns:
-            numpy.ndarray: Colorized depth image or None if no valid data
+            numpy.ndarray: Raw depth image in millimeters or colorized depth image
         """
         current_time = time.time()
         
+        # Define cache variables based on return type
+        cache_to_check = self.cached_depth_colormap if colorized else self.cached_raw_depth
+        last_time = self.last_depth_frame_time
+        
         # Check if we have a valid cached depth image
-        if (self.cached_depth_colormap is not None and 
-            current_time - self.last_depth_frame_time < self.cache_valid_duration):
-            return self.cached_depth_colormap.copy()  # Return a copy to avoid modification
+        if (cache_to_check is not None and 
+            current_time - last_time < self.cache_valid_duration):
+            return cache_to_check.copy()  # Return a copy to avoid modification
         
         try:
             # Wait for a coherent pair of frames with shorter timeout
@@ -152,7 +161,7 @@ class get_realsense:
                     print("Filtering produced invalid depth frame")
                     return None
                 
-                # Convert to numpy array
+                # Convert to numpy array - this contains raw depth values in millimeters
                 depth_image = np.asanyarray(filtered_depth.get_data())
                 
                 # Check if the depth image is valid
@@ -160,18 +169,23 @@ class get_realsense:
                     print("Empty depth image received")
                     return None
                 
-                # Colorize depth map for visualization with improved contrast
-                depth_colormap = cv2.applyColorMap(
-                    cv2.convertScaleAbs(depth_image, alpha=0.03), 
-                    cv2.COLORMAP_JET
-                )
-                
-                # Update cache
-                self.cached_depth_colormap = depth_colormap.copy()
+                # Cache the raw depth values
+                self.cached_raw_depth = depth_image.copy()
                 self.last_depth_frame_time = current_time
                 
-                return depth_colormap
-                
+                # If colorized version requested, create and cache it
+                if colorized:
+                    # Colorize depth map for visualization with improved contrast
+                    depth_colormap = cv2.applyColorMap(
+                        cv2.convertScaleAbs(depth_image, alpha=0.03), 
+                        cv2.COLORMAP_JET
+                    )
+                    self.cached_depth_colormap = depth_colormap.copy()
+                    return depth_colormap
+                else:
+                    # Return the raw depth values in millimeters
+                    return depth_image
+                    
             except Exception as e:
                 print(f"Error processing depth frame: {e}")
                 return None
@@ -179,55 +193,7 @@ class get_realsense:
         except Exception as e:
             print(f"Error capturing depth image: {e}")
             return None
-    
-    def get_frames_synchronized(self):
-        """
-        Get synchronized RGB and depth frames in a single call.
-        
-        Returns:
-            tuple: (rgb_image, depth_colormap) or (None, None) if no valid data
-        """
-        try:
-            # Wait for a coherent pair of frames
-            frames = self.pipeline.wait_for_frames(timeout_ms=1000)
-            
-            # Align frames
-            aligned_frames = self.align.process(frames)
-            depth_frame = aligned_frames.get_depth_frame()
-            color_frame = aligned_frames.get_color_frame()
-            
-            if not depth_frame or not color_frame:
-                return None, None
-            
-            # Process RGB image
-            color_image = np.asanyarray(color_frame.get_data())
-            
-            # Process depth image with filters
-            filtered_depth = self.decimation.process(depth_frame)
-            filtered_depth = self.spatial.process(filtered_depth)
-            filtered_depth = self.temporal.process(filtered_depth)
-            filtered_depth = self.hole_filling.process(filtered_depth)
-            
-            depth_image = np.asanyarray(filtered_depth.get_data())
-            
-            # Colorize depth map for visualization
-            depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(depth_image, alpha=0.03), 
-                cv2.COLORMAP_JET
-            )
-            
-            # Update caches
-            current_time = time.time()
-            self.cached_color_image = color_image.copy()
-            self.cached_depth_colormap = depth_colormap.copy()
-            self.last_color_frame_time = current_time
-            self.last_depth_frame_time = current_time
-            
-            return color_image, depth_colormap
-            
-        except Exception as e:
-            print(f"Error capturing synchronized frames: {e}")
-            return None, None
+
     
     def close(self):
         """
