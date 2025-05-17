@@ -5,6 +5,7 @@ import serial
 import time
 import queue
 import threading
+import math
 from helpers import geo_to_cartesian
 from parsers import parse_gpgga, parse_gprmc, parse_gtimu, imu_to_world
 
@@ -123,9 +124,9 @@ class get_ins:
                     # Read a line from the serial port
                     line = self.serial_connection.readline().decode('ascii', errors='replace').strip()
                     
-                    # Skip empty lines or OK responses
-                    if not line or line == "OK":
-                        continue
+                    # # Skip empty lines or OK responses
+                    # if not line or line == "OK":
+                    #     continue
                     
                     # Process only sentences that start properly
                     if line.startswith('$'):
@@ -269,7 +270,7 @@ class get_ins:
             max_wait_time (float): Maximum time to wait for all sentence types in seconds
             
         Returns:
-            list: [lon, lat, x, y, dx, dy, cog] - None if no valid data available
+            list: [lon, lat, x, y, dx, dy, cog, dir_vec_x, dir_vec_y] - None if no valid data available
         """
         # Check if we're in GPS mode and device is connected
         if not self.is_connected:
@@ -296,8 +297,15 @@ class get_ins:
                     latest_gpgga = self.gpgga_queue.queue[-1]
                     latest_gprmc = self.gprmc_queue.queue[-1]
                     
+                    # Get COG and calculate direction vector components
+                    cog_deg = latest_gprmc[2]  # cog is at index 2 in GPRMC data
+                    cog_rad = math.radians(cog_deg)
+                    dir_vec_x = math.sin(cog_rad)
+                    dir_vec_y = math.cos(cog_rad)
+                    
                     # GPGGA data: [lon, lat, x, y]
                     # GPRMC data: [dx, dy, cog]
+                    # Added: [dir_vec_x, dir_vec_y]
                     combined_data = [
                         latest_gpgga[0],  # lon
                         latest_gpgga[1],  # lat
@@ -305,7 +313,9 @@ class get_ins:
                         latest_gpgga[3],  # y
                         latest_gprmc[0],  # dx
                         latest_gprmc[1],  # dy
-                        latest_gprmc[2]   # cog
+                        latest_gprmc[2],  # cog
+                        dir_vec_x,        # direction vector x-component
+                        dir_vec_y         # direction vector y-component
                     ]
                     return combined_data
                 

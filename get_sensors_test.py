@@ -70,11 +70,19 @@ def main():
             # Create consolidated array with all sensor data
             output = []
             
-            # Add GPS data (7 values)
+            # # Add GPS data (7 values)
+            # if sensor_data['gps_data'] is not None:
+            #     output.extend(sensor_data['gps_data'])  # [lon, lat, x, y, dx, dy, cog]
+            # else:
+            #     output.extend([None] * 7)
+
+            # In get_sensors_test.py
+            # Modify the part where output is extended with GPS data
+            # Add GPS data (9 values instead of 7)
             if sensor_data['gps_data'] is not None:
-                output.extend(sensor_data['gps_data'])  # [lon, lat, x, y, dx, dy, cog]
+                output.extend(sensor_data['gps_data'])  # [lon, lat, x, y, dx, dy, cog, dir_vec_x, dir_vec_y]
             else:
-                output.extend([None] * 7)
+                output.extend([None] * 9)  # Changed from 7 to 9
                 
             # Add IMU data (4 values)
             if sensor_data['imu_data'] is not None:

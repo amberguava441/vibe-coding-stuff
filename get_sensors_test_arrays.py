@@ -47,11 +47,19 @@ def main():
                 # Process data into a simple flat list
                 output = []
                 
+                # # Add GPS data
+                # if sensor_data['gps_data'] is not None:
+                #     output.extend(sensor_data['gps_data'])
+                # else:
+                #     output.extend([None] * 7)
+
+                # In get_sensors_test_arrays.py
+                # Modify the part where output is extended with GPS data
                 # Add GPS data
                 if sensor_data['gps_data'] is not None:
                     output.extend(sensor_data['gps_data'])
                 else:
-                    output.extend([None] * 7)
+                    output.extend([None] * 9)  # Changed from 7 to 9
                     
                 # Add IMU data
                 if sensor_data['imu_data'] is not None:
