@@ -82,6 +82,40 @@ def parse_gprmc(sentence):
         print(f"Error parsing GPRMC: {e}")
         return None
 
+def parse_gpfpd(sentence):
+    """
+    Parse GTIMU sentence and extract accelerations.
+    
+    Args:
+        sentence: NMEA sentence string
+        
+    Returns:
+        list: [accel_x, accel_y] or None if invalid
+    """
+    try:
+        # Validate sentence starts with $GTIMU
+        if not sentence.startswith('$GPFPD'):
+            return None
+        
+        # Split the sentence by comma
+        parts = sentence.split(',')
+        
+        # Validate the sentence has enough parts
+        if len(parts) < 16:
+            return None
+        
+        # Parse acceleration values (fields 6, 7, 8 - indexes 5, 6, 7)
+        # Convert from g to m/s^2 by multiplying by 9.8
+        dx = float(parts[9])
+        dy = float(parts[10])
+        cog_deg = float(parts[3])
+        
+        # Return as an array [accel_x, accel_y]
+        return [dx, dy, cog_deg]
+    except (ValueError, IndexError) as e:
+        print(f"Error parsing GPFPD: {e}")
+        return None
+
 def parse_gtimu(sentence):
     """
     Parse GTIMU sentence and extract accelerations.

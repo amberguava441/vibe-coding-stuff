@@ -7,7 +7,7 @@ import queue
 import threading
 import math
 from helpers import geo_to_cartesian
-from parsers import parse_gpgga, parse_gprmc, parse_gtimu, imu_to_world
+from parsers import parse_gpgga, parse_gprmc, parse_gpfpd, parse_gtimu, imu_to_world
 
 class get_ins:
     def __init__(self, port, baudrate=115200, timeout=1):
@@ -24,7 +24,8 @@ class get_ins:
         
         # Sentence queues - store the latest valid sentences
         self.gpgga_queue = queue.Queue(maxsize=5)
-        self.gprmc_queue = queue.Queue(maxsize=5)
+        #self.gprmc_queue = queue.Queue(maxsize=5)
+        self.gpfpd_queue = queue.Queue(maxsize=5)
         self.gtimu_queue = queue.Queue(maxsize=20)
         
         # Reader thread
@@ -148,12 +149,19 @@ class get_ins:
                                     self.gpgga_queue.get()
                                 self.gpgga_queue.put(data)
                                 
-                        elif line.startswith('$GPRMC'):
-                            data = parse_gprmc(line)
+                        # elif line.startswith('$GPRMC'):
+                        #     data = parse_gprmc(line)
+                        #     if data:
+                        #         if self.gprmc_queue.full():
+                        #             self.gprmc_queue.get()
+                        #         self.gprmc_queue.put(data)
+
+                        elif line.startswith('$GPFPD'):
+                            data = parse_gpfpd(line)
                             if data:
-                                if self.gprmc_queue.full():
-                                    self.gprmc_queue.get()
-                                self.gprmc_queue.put(data)
+                                if self.gpfpd_queue.full():
+                                    self.gpfpd_queue.get()
+                                self.gpfpd_queue.put(data)
                                 
                         elif line.startswith('$GTIMU'):
                             data = parse_gtimu(line)
@@ -182,8 +190,10 @@ class get_ins:
         # Clear queues
         while not self.gpgga_queue.empty():
             self.gpgga_queue.get()
-        while not self.gprmc_queue.empty():
-            self.gprmc_queue.get()
+        # while not self.gprmc_queue.empty():
+        #     self.gprmc_queue.get()
+        while not self.gpfpd_queue.empty():
+            self.gpfpd_queue.get()
         while not self.gtimu_queue.empty():
             self.gtimu_queue.get()
             
@@ -217,8 +227,9 @@ class get_ins:
             
         try:
             # Send commands to get GPGGA and GPRMC sentences
-            success1 = self.send_command("$CMD,OUTPUT,COM0,GPGGA,0.2*FF")
-            success2 = self.send_command("$CMD,THROUGH,COM0,GPRMC,0.2*FF")
+            success1 = self.send_command("$CMD,OUTPUT,COM0,GPGGA,0.1*FF")
+            #success2 = self.send_command("$CMD,THROUGH,COM0,GPRMC,0.2*FF")
+            success2 = self.send_command("$CMD,OUTPUT,COM0,GPFPD,0.1*FF")
             
             if success1 and success2:
                 self.gps_mode_active = True
@@ -292,13 +303,14 @@ class get_ins:
             # Keep checking for both sentence types until we have them or timeout
             while time.time() - start_time < max_wait_time:
                 # Check if we have both sentence types
-                if not self.gpgga_queue.empty() and not self.gprmc_queue.empty():
+                if not self.gpgga_queue.empty() and not self.gpfpd_queue.empty():
                     # Get the latest data from queues without removing
                     latest_gpgga = self.gpgga_queue.queue[-1]
-                    latest_gprmc = self.gprmc_queue.queue[-1]
+                    #latest_gprmc = self.gprmc_queue.queue[-1]
+                    latest_gpfpd = self.gpfpd_queue.queue[-1]
                     
                     # Get COG and calculate direction vector components
-                    cog_deg = latest_gprmc[2]  # cog is at index 2 in GPRMC data
+                    cog_deg = latest_gpfpd[2]  # cog is at index 2 in GPRMC data
                     cog_rad = math.radians(cog_deg)
                     dir_vec_x = math.sin(cog_rad)
                     dir_vec_y = math.cos(cog_rad)
@@ -311,12 +323,17 @@ class get_ins:
                         latest_gpgga[1],  # lat
                         latest_gpgga[2],  # x
                         latest_gpgga[3],  # y
-                        latest_gprmc[0],  # dx
-                        latest_gprmc[1],  # dy
-                        latest_gprmc[2],  # cog
+                        #latest_gprmc[0],  # dx
+                        #latest_gprmc[1],  # dy
+                        latest_gpfpd[0],  # cog
+                        latest_gpfpd[1],  # cog
+                        latest_gpfpd[2],  # cog
                         dir_vec_x,        # direction vector x-component
                         dir_vec_y         # direction vector y-component
                     ]
+
+                    print(dir_vec_x, dir_vec_y, latest_gpfpd[2])
+
                     return combined_data
                 
                 # Small sleep to avoid hogging CPU
