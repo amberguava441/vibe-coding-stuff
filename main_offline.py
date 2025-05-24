@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Main Sensory Stack Integration
-Combines GPS, Camera, Lane Detection, and YOLO Object Detection
-"""
 
 import time
 import queue
@@ -19,9 +15,6 @@ from c import camera, LaneDetectionTester
 from get_yolo import YoloV5Detector, process_lane_and_detection_3d
 from ct import getF
 from p import planner
-
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
 
 class SensoryStack:
     def __init__(self, gps_port='/dev/ttyUSB0', camera_id=100, yolo_weights='yolov5s.pt'):
@@ -66,8 +59,7 @@ class SensoryStack:
         
         # Destination coordinates (fixed)
         self.destination_lon = 126.62565295
-        self.destination_lat = 45.72713751+3.743409629044988e-6*5
-
+        self.destination_lat = 45.72713751
         self.planner_initialized = False
         
         # Threading components for YOLO
@@ -191,9 +183,9 @@ class SensoryStack:
                 print("[WARNING] Failed to get camera frame")
                 return None, []
             
-            #print(f"[DEBUG] RGB frame shape: {rgb_frame.shape}")
-            #if depth_frame is not None:
-                #print(f"[DEBUG] Depth frame shape: {depth_frame.shape}")
+            print(f"[DEBUG] RGB frame shape: {rgb_frame.shape}")
+            if depth_frame is not None:
+                print(f"[DEBUG] Depth frame shape: {depth_frame.shape}")
             
             # 3. Lane detection and coordinate transformation
             lane_points = []
@@ -206,29 +198,11 @@ class SensoryStack:
                                            for x, y in detected_lanes]
                     else:
                         lane_points_pixel = [(x, y, 0) for x, y in detected_lanes]
-
-                    W = 640
-                    H = 480
-                    lane_points_pixel = [(x, y, depth_value) for x, y, depth_value in lane_points_pixel if 0 < x < W - 5 and 0 < y < H - 5]
                     
                     # Convert from pixel coordinates to world coordinates using getF()
                     lane_points = getF(lane_points_pixel, self.K, self.R, self.T)
-                    lane_points = [(x, y) for x, y, z in lane_points]
-
-                    lanel = []
-                    laner = []
-                    for x, y in lane_points:
-                        if x < 0:
-                            lanel.append((x,y))
-                        elif x >= 0:
-                            laner.append((x,y))
-                        else:
-                            continue
-                    lane_points= []
-                    lane_points.append(lanel)
-                    lane_points.append(laner)
                     
-                #print(f"[DEBUG] Detected {len(lane_points)} lane points")
+                print(f"[DEBUG] Detected {len(lane_points)} lane points")
             except Exception as e:
                 print(f"[WARNING] Lane detection failed: {e}")
                 lane_points = []
@@ -265,7 +239,7 @@ class SensoryStack:
                             print(f"[WARNING] 3D processing failed: {e}")
                             obstacles_3d = []
                     
-                #print(f"[DEBUG] Detected {len(obstacles_3d)} 3D obstacles")
+                print(f"[DEBUG] Detected {len(obstacles_3d)} 3D obstacles")
             except Exception as e:
                 print(f"[WARNING] YOLO detection failed: {e}")
                 obstacles_3d = []
@@ -282,32 +256,31 @@ class SensoryStack:
                 lane_points,  # list of lane points [(x,y,z), ...]
                 obstacles_3d  # list of obstacles [class_id, center_x, center_y, center_z, width, length, height]
             ]
-            self.path_planner.globalplanner.writepath()
+            
             # 6. Generate path plan if planner is initialized
             planned_path = []
-            if self.planner_initialized:
-                try:
-                    # Prepare planner inputs according to getpath() signature:
-                    # getpath(self, xy, dxy, jw, o, lane, ol)
-                    xy = (x, y)              # current position
-                    dxy = (dir_vec_x, dir_vec_y)   
-                    #dxy = (-1, -4)
-                    jw = (lon, lat)          # current GPS coordinates
-                    o = cog                  # orientation (course over ground)
-                    #lane = lane_points       # lane points
-                    lane = [[(-100, 0), (-100, 1), (-100, 2), (-100, 3), (-100, 4), (-100, 5), 
+            fixed_lane = [[(-100, 0), (-100, 1), (-100, 2), (-100, 3), (-100, 4), (-100, 5), 
                                 (-100, 6), (-100, 7), (-100, 8), (-100, 9), (-100, 10), (-100, 11), 
                                     (-100, 12), (-100, 13), (-100, 14), (-100, 15), (-100, 16), (-100, 17), 
                                         (-100, 18), (-100, 19)], [(100, 0), (100, 1), (100, 2), (100, 3), (100, 4), (100, 5), 
                                             (100, 6), (100, 7), (100, 8), (100, 9), (100, 10), (100, 11), 
                                                 (100, 12), (100, 13), (100, 14), (100, 15), (100, 16), (100, 17), 
                                                     (100, 18), (100, 19)]]
-                    #ol = obstacles_3d        # obstacle list
-                    ol = []
+
+            if self.planner_initialized:
+                try:
+                    # Prepare planner inputs according to getpath() signature:
+                    # getpath(self, xy, dxy, jw, o, lane, ol)
+                    xy = (x, y)              # current position
+                    dxy = (dx, dy)           # current velocity
+                    jw = (lon, lat)          # current GPS coordinates
+                    o = cog                  # orientation (course over ground)
+                    #lane = lane_points       # lane points
+                    lane = fixed_lane
+                    ol = obstacles_3d        # obstacle list
                     
                     # Get path from planner
                     planned_path = self.path_planner.getpath(xy, dxy, jw, o, lane, ol)
-                    self.path_planner.localplanner.writepath()
                     
                     #print(f"[DEBUG] Generated path with {len(planned_path)} waypoints")
                     
@@ -364,19 +337,19 @@ class SensoryStack:
                     # Extract key information for status display
                     x, y, dir_vec_x, dir_vec_y, lon, lat, cog, lane_points, obstacles_3d = sensory_data
                     
-                    # # Print status every 10 frames
-                    # if frame_count % 10 == 0:
-                    #     print(f"[INFO] Frame {frame_count}: Pos=({x:.2f}, {y:.2f}), "
-                    #           f"GPS=({lat:.6f}, {lon:.6f}), COG={cog:.1f}°, "
-                    #           f"Lanes={len(lane_points)}, Obstacles={len(obstacles_3d)}, "
-                    #           f"Path_waypoints={len(planned_path)}")
+                    # Print status every 10 frames
+                    if frame_count % 10 == 0:
+                        print(f"[INFO] Frame {frame_count}: Pos=({x:.2f}, {y:.2f}), "
+                              f"GPS=({lat:.6f}, {lon:.6f}), COG={cog:.1f}°, "
+                              f"Lanes={len(lane_points)}, Obstacles={len(obstacles_3d)}, "
+                              f"Path_waypoints={len(planned_path)}")
                     
                     # Save to file if requested
                     if save_to_file:
                         with open(log_file, 'a') as f:
                             timestamp = time.time()
                             # Save both sensory data and planned path
-                            f.write(f"{timestamp}: SENSORY={sensory_data}\n")
+                            #f.write(f"{timestamp}: SENSORY={sensory_data}\n")
                             f.write(f"{timestamp}: PLANNED_PATH={planned_path}\n")
                 
                 # Check duration limit
