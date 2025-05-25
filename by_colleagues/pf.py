@@ -215,7 +215,7 @@ class VFHplanner():
     def setglobalmap(self, xy, dxy, txy, tdxy):
         self.globalmap.x, self.globalmap.y = xy
         self.globalmap.tx, self.globalmap.ty = txy
-
+        
         dx, dy = dxy
         dxyl = (dx**2 + dy**2)**0.5
         self.globalmap.dx = dx / dxyl
@@ -230,6 +230,7 @@ class VFHplanner():
         self.globalmap.a = math.atan2(self.globalmap.dy, self.globalmap.dx)-np.pi/2
 
     def setScenario(self, xy, dxy, txy, tdxy, lane, ol):
+        
         self.setglobalmap(xy, dxy, txy, tdxy)
 
         self.getlocalmap(lane, ol)
@@ -249,8 +250,11 @@ class VFHplanner():
 
     def setol(self, ol):
         self.localmap.ol = []
-        if ol and all(isinstance(r, list) and len(r) == 7 for r in ol):
+        if ol:
             for _, x, y, z, w, l, h in ol:
+                w = 0.3
+                l = 0.3
+                h = 0.3
                 self.localmap.ol.append([(x, y, z), (w, l, h)])
 
     def setlane(self, lane):
@@ -280,12 +284,15 @@ class VFHplanner():
         self.globalmap.fy = []
         self.globalmap.fl = []
         self.globalmap.pl = []
+        
         if self.setScenario(xy, dxy, txy, tdxy, lane, ol):
+
             self.localmap.fx, self.localmap.fy, self.localmap.fl, self.localmap.pl =  self.VFH(
                                         self.localmap.x, self.localmap.y, self.localmap.dx, self.localmap.dy,
                                         self.localmap.tx, self.localmap.ty, self.localmap.tdx, self.localmap.tdy,
                                         self.localmap.ol, self.localmap.lanel, self.localmap.laner,
                                         self.maxk, self.safedistance)
+            
             if self.localmap.pl:
                 return True
         return False
@@ -345,8 +352,6 @@ class VFHplanner():
         for xyz, wlh in self.localmap.ol:
             cx, cy, _ = xyz
             w, l, _ = wlh
-            w = w
-            l = l
             rdx = np.concatenate((np.arange(0, -w, -1), np.arange(1, w, 1)))
             rdy = np.concatenate((np.arange(0, -l, -1), np.arange(1, l, 1)))
             for rx in rdx:
@@ -417,6 +422,7 @@ class VFHplanner():
 
         fx = self.solvequinticcoefficient(x, dx, 0.0, tx, tdx, 0.0, fl)
         fy = self.solvequinticcoefficient(y, dy, 0.0, ty, tdy, 0.0, fl)
+        
         if self.ifsafe(fx, fy, fl, lanely, lanery, ol, lanel, laner, sd) and self.ifsmooth(fx, fy, fl, maxk):
             return fx, fy, fl, self.getpathlength(fx, fy, fl)
 
@@ -480,8 +486,8 @@ class VFHplanner():
         for t in np.linspace(0, fl, 100):
             x = fx[0] + fx[1]*t + fx[2]*t**2 + fx[3]*t**3 + fx[4]*t**4 + fx[5]*t**5
             y = fy[0] + fy[1]*t + fy[2]*t**2 + fy[3]*t**3 + fy[4]*t**4 + fy[5]*t**5
-            if y < lanely[0] or y > lanely[-1] and y < lanery[0] or y > lanery[-1]:
-                return False
+            # if y < lanely[0] or y > lanely[-1] and y < lanery[0] or y > lanery[-1]:
+            #     return False
             if x < lanel(y)+sd or x > laner(y)-sd:
                 return False
 

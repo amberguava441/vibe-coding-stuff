@@ -22,8 +22,8 @@ class mapdata:
         self.xl = xl
         self.yl = yl
 
-#def readmap(picture='map.png'):
-def readmap(picture='map_null.png'):
+def readmap(picture='map.png'):
+#def readmap(picture='map_null.png'):
     if os.path.exists(picture):
         picture = cv.imread(picture).swapaxes(0, 1)[:, ::-1, :]
         map = cv.cvtColor(picture, cv.COLOR_BGR2GRAY)
@@ -60,7 +60,7 @@ def getmap(map):
         map.mapjw = mapjw
     return map
 
-def creatMap(size=0.42112,sizejx=0.0000053829375,sizewy=3.743409629044988e-6,r=743,c=1101,x=0,y=0,j=126.62781246,w=45.72934540):#size=0.42112,sizejx=0.0000053229375,sizewy=3.743409629044988e-6,r=764,c=1101,x=0,y=0,j=126.62781387,w=45.72934448
+def creatMap(size=0.42112,sizejx=0.0000053829375,sizewy=3.743409629044988e-6,r=763,c=1101,x=0,y=0,j=126.62781246,w=45.72934540):#size=0.42112,sizejx=0.0000053229375,sizewy=3.743409629044988e-6,r=764,c=1101,x=0,y=0,j=126.62781387,w=45.72934448
     map = mapdata(readmap())
     if map.map is not None:
         map = setdata(map,size,sizejx,sizewy,r,c,x,y,j,w)

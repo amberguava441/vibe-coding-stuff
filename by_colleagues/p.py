@@ -24,7 +24,6 @@ class planner():
         _, self.gp, _ = self.globalplanner.getpath()
 
     def getpath(self, xy, dxy, jw, o, lane, ol):
-        print(f'**{dxy}')
         self.x, self.y = xy[0], xy[1]
         self.dx, self.dy = dxy[0], dxy[1]
         self.o = o
@@ -35,13 +34,13 @@ class planner():
         if self.gp:
 
             self.updategp()
-
+            
             if self.localplanner.plan((self.here.x, self.here.y), (self.dx, self.dy), (self.next.x,self.next.y), (self.tdx, self.tdy), lane, ol):
                 self.localplanner.transform(self.x, self.y)
             _, self.gt, _, _ = self.localplanner.getpath()
-
+            
             return self.gt
-        
+
         return []
     
     def updategp(self):
