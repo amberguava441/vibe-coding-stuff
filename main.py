@@ -290,8 +290,7 @@ class SensoryStack:
                     # Prepare planner inputs according to getpath() signature:
                     # getpath(self, xy, dxy, jw, o, lane, ol)
                     xy = (x, y)              # current position
-                    dxy = (dir_vec_x, dir_vec_y)   
-                    #dxy = (-1, -4)
+                    dxy = (dir_vec_x, dir_vec_y)
                     jw = (lon, lat)          # current GPS coordinates
                     o = cog                  # orientation (course over ground)
                     #lane = lane_points       # lane points
