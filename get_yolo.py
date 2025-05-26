@@ -135,7 +135,7 @@ def process_lane_and_detection_3d(yolo_send_queue: queue.Queue, depth_queue: que
             u_coords, v_coords = np.meshgrid(np.arange(x1, x2), np.arange(y1, y2))
             u_coords = u_coords[mask]
             v_coords = v_coords[mask]
-            d = depth_roi[mask] / 1000
+            d = depth_roi[mask]
 
             # Calculate points in camera coordinates
             x_cam = (u_coords - cx) * d / fx
